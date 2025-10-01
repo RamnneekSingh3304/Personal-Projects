@@ -1,2 +1,2 @@
-#Active-Directory-Lab
+# Active-Directory-Lab
 This lab project demonstrates the deployment and configuration of a small enterprise environment using VirtualBox on a single host machine. The lab simulates a real-world IT infrastructure by combining Windows Server with a client workstation, Active Directory Domain Services (AD DS), Group Policy, and role-based access control. The goal is to create a functional domain where centralized management, authentication, and resource access can be tested in a safe, virtual environment.
