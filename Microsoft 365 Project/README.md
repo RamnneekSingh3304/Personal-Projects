@@ -6,7 +6,7 @@ Project Overview
 
 The lab simulates how IT administrators manage a modern cloud environment. Every configuration—from tenant creation to automated remediation—was implemented step-by-step to showcase practical expertise in Microsoft 365 administration, device management, and enterprise security.
 
-Key Highlights
+Key Highlights:
 
 Tenant Setup: Created a Microsoft 365 E3 tenant, verified global admin accounts, and enabled Multi-Factor Authentication (MFA).
 
