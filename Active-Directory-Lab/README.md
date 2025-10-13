@@ -16,7 +16,7 @@ The lab demonstrates real-world IT administration scenarios in a safe, isolated 
 - Centralizing file storage with home directories and folder redirection.
 
 **Completion Date:** September 29, 2025  
-**Estimated Duration:** 4–6 hours  
+**Estimated Duration:** 6-12 hours  
 
 ---
 
