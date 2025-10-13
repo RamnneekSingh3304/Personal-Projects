@@ -8,11 +8,11 @@ This repository showcases a hands-on **Active Directory lab project** simulating
 
 The lab demonstrates real-world IT administration scenarios in a safe, isolated virtual environment. Key objectives include:
 
-- Deploying and configuring a Windows Server Active Directory domain.  
-- Managing users, groups, organizational units (OUs), and permissions.  
-- Joining client machines to the domain and testing logins.  
-- Automating administrative tasks using PowerShell.  
-- Implementing Group Policy Objects (GPOs) and logon scripts.  
+- Deploying and configuring a Windows Server Active Directory domain.
+- Managing users, groups, organizational units (OUs), and permissions.
+- Joining client machines to the domain and testing logins.
+- Automating administrative tasks using PowerShell.
+- Implementing Group Policy Objects (GPOs) and logon scripts.
 - Centralizing file storage with home directories and folder redirection.
 
 **Completion Date:** September 29, 2025  
@@ -22,11 +22,11 @@ The lab demonstrates real-world IT administration scenarios in a safe, isolated 
 
 ## Skills Developed
 
-- **Active Directory Administration:** Domain setup, OU structuring, user/group management, role-based access control.  
-- **Windows Server Management:** Installing roles, managing updates, configuring DNS, and networking.  
-- **Group Policy & Security:** Creating and linking GPOs, security restrictions, NTFS permissions, folder redirection, and logon scripts.  
-- **Automation:** PowerShell scripting to streamline administrative tasks.  
-- **Virtualization & Networking:** Configuring VirtualBox VMs, NAT networks, snapshots, and domain-joined client integration.  
+- **Active Directory Administration:** Domain setup, OU structuring, user/group management, role-based access control.
+- **Windows Server Management:** Installing roles, managing updates, configuring DNS, and networking.
+- **Group Policy & Security:** Creating and linking GPOs, security restrictions, NTFS permissions, folder redirection, and logon scripts.
+- **Automation:** PowerShell scripting to streamline administrative tasks.
+- **Virtualization & Networking:** Configuring VirtualBox VMs, NAT networks, snapshots, and domain-joined client integration.
 - **Professional Skills:** Problem-solving, structured documentation, project execution, and adherence to best practices.
 
 ---
