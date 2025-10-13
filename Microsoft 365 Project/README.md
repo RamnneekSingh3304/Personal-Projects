@@ -1,3 +1,7 @@
 # Microsoft 365 Project
-This lab built a functional Microsoft 365 E3 environment with 5–7 users, enrolled devices, and robust security. Key achievements included automated device setup with Autopilot, secure email management, and enforced compliance via Intune and MDE. The project mirrored enterprise IT operations, addressing challenges like policy delays and demonstrating practical admin skills. It serves as a portfolio piece, with potential for future exploration into Power Automate or hybrid setups.
-These skills align with roles in IT helpdesk, system administration, or cloud security, supporting certifications like MD-102 and MS-500.
+This project demonstrates the full design, deployment, and management of a Microsoft 365 Enterprise E3 environment built entirely within a personal home lab. It recreates the core functions of a real enterprise IT environment — covering identity management, device enrollment, security enforcement, collaboration tools, automation, and enterprise onboarding.
+
+The lab was built from the ground up to simulate how IT administrators manage a modern cloud-based infrastructure. Every configuration, from initial tenant creation to automated remediation scripts, was performed through the Microsoft 365 Admin Center, Entra ID, Intune (Endpoint Manager), and Microsoft Defender for Endpoint.
+Each section is documented in detail, including configuration steps, reasoning, and verification, reflecting hands-on understanding of enterprise-grade Microsoft 365 administration.
+
+This project serves both as a learning environment and a portfolio demonstration, showcasing skills directly aligned with helpdesk, systems administration, and cloud security roles.
