@@ -20,17 +20,6 @@ The lab provides practical experience in:
 
 ---
 
-## Core Achievements
-
-- Built a cloud-based identity and access infrastructure with Entra ID.  
-- Enrolled and managed devices with automated compliance policies.  
-- Implemented security measures to protect users and data across endpoints.  
-- Configured collaboration tools to centralize communication and file storage.  
-- Automated administrative tasks and application deployment for efficiency.  
-- Deployed devices quickly with zero-touch provisioning using Autopilot.
-
----
-
 ## Skills Developed
 
 - **Cloud Administration:** User/group management, device enrollment, policy configuration.  
@@ -42,4 +31,4 @@ The lab provides practical experience in:
 
 ---
 
-This lab demonstrates practical **cloud administration skills**, preparing for modern IT roles and certifications such as **MD-102** and **MS-500**.
+This lab demonstrates practical **cloud administration skills**, preparing learners for modern IT roles and certifications such as **MD-102** and **MS-500**.
