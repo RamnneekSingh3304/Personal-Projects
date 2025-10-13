@@ -1,2 +1,3 @@
-# Active-Directory-Lab
-This lab project demonstrates the deployment and configuration of a small enterprise environment using VirtualBox on a single host machine. The lab simulates a real-world IT infrastructure by combining Windows Server with a client workstation, Active Directory Domain Services (AD DS), Group Policy, and role-based access control. The goal is to create a functional domain where centralized management, authentication, and resource access can be tested in a safe, virtual environment.
+# Microsoft 365 Project
+This lab built a functional Microsoft 365 E3 environment with 5–7 users, enrolled devices, and robust security. Key achievements included automated device setup with Autopilot, secure email management, and enforced compliance via Intune and MDE. The project mirrored enterprise IT operations, addressing challenges like policy delays and demonstrating practical admin skills. It serves as a portfolio piece, with potential for future exploration into Power Automate or hybrid setups.
+These skills align with roles in IT helpdesk, system administration, or cloud security, supporting certifications like MD-102 and MS-500.
