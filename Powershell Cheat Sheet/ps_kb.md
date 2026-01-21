@@ -1,660 +1,687 @@
-# PowerShell IT Support Knowledge Base
+# PowerShell IT Support Cheat Sheet
 
-Quick reference for IT support tasks, troubleshooting, and scripting.
+Copy-paste commands for daily IT support. Brief explanations, maximum coverage.
 
----
-
-## 📑 Table of Contents
-
-### [Quick Start](#quick-start)
-### [Common IT Tasks](#common-it-tasks)
-- [File & Folder Operations](#file--folder-operations)
-- [Service Management](#service-management)
-- [Process Management](#process-management)
-- [User & Group Management](#user--group-management)
-- [Network Troubleshooting](#network-troubleshooting)
-- [Disk & Storage](#disk--storage)
-- [Event Logs](#event-logs)
-
-### [Remote Management](#remote-management)
-### [Active Directory](#active-directory)
-### [Scripting Basics](#scripting-basics)
-### [Common Troubleshooting](#common-troubleshooting)
-### [Useful One-Liners](#useful-one-liners)
+**Quick Nav:** [Services](#services) | [Processes](#processes) | [Files](#files) | [Users](#users) | [Network](#network) | [Disk](#disk) | [Logs](#logs) | [AD](#active-directory) | [Remote](#remote) | [System Info](#system-info) | [Scenarios](#troubleshooting-scenarios)
 
 ---
 
-## Quick Start
+## Getting Started
 
-**Open PowerShell as Admin**
-- Windows: `Win + X` → "Windows PowerShell (Admin)" or "Terminal (Admin)"
-- Run: `powershell` or `pwsh` (PowerShell 7+)
+**Open as Admin:** `Win + X` → PowerShell (Admin)
 
-**Get Help**
+**Enable scripts:**
+```powershell
+Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+**Get help on any command:**
 ```powershell
 Get-Help Get-Service -Examples
-Get-Command *firewall*
-Get-Command -Verb Get -Noun Service
+Get-Command *service*              # Find commands with 'service'
 ```
 
-**Pipeline Basics**
+**Pipeline basics:** Pass output to next command
 ```powershell
-# Pass output to next command
-Get-Process | Where-Object {$_.CPU -gt 10}
-Get-Service | Where-Object {$_.Status -eq "Stopped"} | Start-Service
-```
-
-**Execution Policy** (if scripts won't run)
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-# Or bypass for single script:
-powershell.exe -ExecutionPolicy Bypass -File .\script.ps1
+Get-Service | Where Status -eq Stopped | Start-Service
 ```
 
 ---
 
-## Common IT Tasks
+## Services
 
-### File & Folder Operations
-
-**List Files**
+### View Services
 ```powershell
-Get-ChildItem C:\Logs                    # List directory
-Get-ChildItem C:\Logs -Recurse           # Include subdirectories
-Get-ChildItem C:\Logs\*.log              # Filter by extension
-Get-ChildItem C:\Logs -File              # Files only
-Get-ChildItem C:\Logs -Directory         # Folders only
+Get-Service                        # All services
+Get-Service Spooler                # Specific service
+Get-Service -Name *print*          # Wildcard search
+Get-Service | Where Status -eq Running
+Get-Service | Where Status -eq Stopped
+```
+*Use wildcard when you don't know exact service name*
 
-# Find files modified in last 7 days
-Get-ChildItem C:\Logs -Recurse | Where-Object {$_.LastWriteTime -gt (Get-Date).AddDays(-7)}
+### Service Details & Dependencies
+```powershell
+Get-Service Spooler | Select *              # All properties
+Get-Service Spooler | Format-List *         # Easier to read
+Get-Service Spooler -DependentServices      # What needs this
+Get-Service Spooler -RequiredServices       # What this needs
+```
+*Check dependencies before stopping service*
 
-# Find large files (>100MB)
-Get-ChildItem C:\ -Recurse | Where-Object {$_.Length -gt 100MB} | Select-Object FullName, @{N="SizeMB";E={[math]::Round($_.Length/1MB,2)}}
+### Control Services
+```powershell
+Start-Service Spooler
+Stop-Service Spooler
+Restart-Service Spooler
+Stop-Service Spooler -Force                 # Force unresponsive
+Restart-Service Spooler -Force
+
+# Multiple services
+Stop-Service Spooler,WSearch -Force
+'Spooler','WSearch' | Start-Service
+```
+*Always use -Force on stuck services*
+
+### Startup Type
+```powershell
+Set-Service Spooler -StartupType Automatic
+Set-Service Spooler -StartupType Manual
+Set-Service Spooler -StartupType Disabled
+Set-Service Spooler -StartupType Automatic -Status Running  # Set & start
+```
+*Manual = start when needed, Disabled = never start*
+
+### Export
+```powershell
+Get-Service | Export-Csv C:\services.csv -NoTypeInformation
+Get-Service | Where Status -eq Running | Out-File C:\running.txt
 ```
 
-**Create/Delete Files & Folders**
+---
+
+## Processes
+
+### View Processes
 ```powershell
-New-Item -Path C:\Temp -ItemType Directory        # Create folder
-New-Item -Path C:\file.txt -ItemType File         # Create file
-Remove-Item C:\Temp -Recurse -Force               # Delete folder
-Remove-Item C:\Logs\*.log -Force                  # Delete matching files
+Get-Process                                        # All processes
+Get-Process chrome                                 # Specific process
+Get-Process -Id 1234                               # By PID
+Get-Process | Sort CPU -Desc | Select -First 10   # Top CPU
+Get-Process | Sort WS -Desc | Select -First 10    # Top memory
+```
+*WS = Working Set (physical memory)*
+
+### Detailed Info
+```powershell
+Get-Process | Select Name,Id,CPU,@{N='MemMB';E={[int]($_.WS/1MB)}}
+Get-Process | Select Name,Path,Company,Description
+Get-Process -Id 1234 | Select *                    # Everything
+Get-Process -IncludeUserName | Where UserName -like "*jdoe*"
+```
+*Check Path and Company to identify unknown processes*
+
+### Kill Processes
+```powershell
+Stop-Process -Name notepad
+Stop-Process -Id 1234
+Stop-Process -Name chrome -Force           # Force frozen process
+Get-Process chrome | Stop-Process          # All instances
+```
+*-Force kills immediately without cleanup*
+
+### Start & Monitor
+```powershell
+Start-Process notepad
+Start-Process notepad C:\file.txt
+Start-Process cmd -Verb RunAs              # Run as admin
+
+# Monitor (Ctrl+C to stop)
+while($true){Get-Process chrome | Select CPU,@{N='MemMB';E={[int]($_.WS/1MB)}}; Start-Sleep 2}
 ```
 
-**Copy/Move Files**
+---
+
+## Files
+
+### List Files
 ```powershell
-Copy-Item C:\source.txt D:\backup\                # Copy file
-Copy-Item C:\Folder D:\Backup -Recurse            # Copy folder
-Move-Item C:\old.txt D:\new.txt                   # Move/rename
+Get-ChildItem C:\Temp                      # List (dir/ls work too)
+Get-ChildItem C:\Temp -Recurse             # Include subfolders
+Get-ChildItem C:\Temp\*.log                # Filter extension
+Get-ChildItem C:\Temp -File                # Files only
+Get-ChildItem C:\Temp -Directory           # Folders only
+Get-ChildItem C:\Temp -Force               # Show hidden/system
 ```
 
-**Search File Content**
+### Find Files
+```powershell
+# Modified last 7 days
+Get-ChildItem C:\Logs -Recurse | Where LastWriteTime -gt (Get-Date).AddDays(-7)
+
+# Files >100MB
+Get-ChildItem C:\ -Recurse -File | Where Length -gt 100MB
+
+# With size in MB
+Get-ChildItem C:\Logs | Select Name,@{N='SizeMB';E={[int]($_.Length/1MB)}}
+
+# Oldest files
+Get-ChildItem C:\Logs | Sort LastWriteTime | Select -First 10
+
+# Group by extension
+Get-ChildItem C:\Temp -File | Group Extension | Sort Count -Desc
+```
+*Find space hogs or old files to delete*
+
+### Create/Delete
+```powershell
+New-Item -Path C:\Temp -ItemType Directory
+New-Item -Path C:\file.txt -ItemType File
+Remove-Item C:\Temp -Recurse -Force        # Delete folder
+Remove-Item C:\Logs\*.log -Force           # Delete all .log
+
+# Delete old files (>30 days)
+Get-ChildItem C:\Logs | Where LastWriteTime -lt (Get-Date).AddDays(-30) | Remove-Item
+```
+*-Recurse -Force deletes everything - double check path!*
+
+### Copy/Move
+```powershell
+Copy-Item C:\source.txt D:\backup\
+Copy-Item C:\Folder D:\Backup -Recurse
+Move-Item C:\old.txt C:\new.txt            # Rename
+
+# Copy with timestamp
+$date = Get-Date -Format 'yyyyMMdd_HHmmss'
+Copy-Item C:\file.txt "C:\file_$date.txt"
+```
+
+### Search Content
 ```powershell
 # Find text in files
 Get-ChildItem C:\Logs\*.log | Select-String "ERROR"
 
-# Get matching files
-Get-ChildItem C:\Logs\*.log -Recurse | Select-String "ERROR" | Select-Object -Unique Path
+# Show unique files containing text
+Get-ChildItem C:\Logs -Recurse | Select-String "ERROR" | Select -Unique Path
+
+# With line numbers
+Get-ChildItem C:\Logs\*.log | Select-String "ERROR" | Select Filename,LineNumber,Line
 ```
+*Search logs without opening each file*
 
-### Service Management
+---
 
-**View Services**
+## Users
+
+### Local Users
 ```powershell
-Get-Service                                       # All services
-Get-Service -Name *windows*                       # Filter by name
-Get-Service | Where-Object {$_.Status -eq "Running"}  # Running only
-Get-Service | Where-Object {$_.Status -eq "Stopped"} | Select-Object Name, DisplayName
-```
-
-**Start/Stop/Restart Services**
-```powershell
-Start-Service -Name Spooler
-Stop-Service -Name Spooler
-Restart-Service -Name Spooler
-
-# Multiple services
-Stop-Service -Name Spooler, WSearch
-```
-
-**Change Service Startup Type**
-```powershell
-Set-Service -Name Spooler -StartupType Automatic
-Set-Service -Name Spooler -StartupType Manual
-Set-Service -Name Spooler -StartupType Disabled
-```
-
-**Service Troubleshooting**
-```powershell
-# Check service status and dependencies
-Get-Service -Name Spooler | Select-Object *
-Get-Service -Name Spooler -DependentServices     # Services that depend on this
-Get-Service -Name Spooler -RequiredServices      # Services this depends on
-
-# Restart service and dependencies
-Restart-Service -Name Spooler -Force
-```
-
-### Process Management
-
-**View Processes**
-```powershell
-Get-Process                                       # All processes
-Get-Process -Name chrome                          # Specific process
-Get-Process | Sort-Object CPU -Descending | Select-Object -First 10  # Top CPU
-Get-Process | Sort-Object WS -Descending | Select-Object -First 10   # Top Memory
-
-# Detailed info
-Get-Process -Name chrome | Select-Object Name, Id, CPU, @{N="MemoryMB";E={[math]::Round($_.WS/1MB,2)}}
-```
-
-**Kill Processes**
-```powershell
-Stop-Process -Name notepad                        # By name
-Stop-Process -Id 1234                             # By PID
-Stop-Process -Name chrome -Force                  # Force kill
-Get-Process -Name chrome | Stop-Process           # Kill all instances
-```
-
-**Start Process**
-```powershell
-Start-Process notepad.exe
-Start-Process notepad.exe C:\file.txt             # With argument
-Start-Process cmd.exe -Verb RunAs                 # As admin
-```
-
-### User & Group Management
-
-**Local Users**
-```powershell
-# View users
-Get-LocalUser
+Get-LocalUser                              # All users
 Get-LocalUser -Name jdoe
+Get-LocalUser | Where Enabled -eq $true
+Get-LocalUser | Select Name,Enabled,LastLogon,PasswordExpires
 
 # Create user
-$Password = Read-Host -AsSecureString "Enter Password"
-New-LocalUser -Name "jdoe" -Password $Password -FullName "John Doe"
+$pwd = Read-Host -AsSecureString "Password"
+New-LocalUser -Name "jdoe" -Password $pwd -FullName "John Doe"
 
-# Disable/Enable user
-Disable-LocalUser -Name jdoe
-Enable-LocalUser -Name jdoe
-
-# Remove user
-Remove-LocalUser -Name jdoe
-
-# Change password
+# Modify
 Set-LocalUser -Name jdoe -Password (Read-Host -AsSecureString "New Password")
+Enable-LocalUser -Name jdoe
+Disable-LocalUser -Name jdoe
+Remove-LocalUser -Name jdoe
 ```
 
-**Local Groups**
+### Local Groups
 ```powershell
-# View groups
 Get-LocalGroup
 Get-LocalGroupMember -Group "Administrators"
-
-# Add user to group
 Add-LocalGroupMember -Group "Administrators" -Member "jdoe"
-
-# Remove from group
+Add-LocalGroupMember -Group "Administrators" -Member "jdoe","jsmith"  # Multiple
 Remove-LocalGroupMember -Group "Administrators" -Member "jdoe"
-```
-
-### Network Troubleshooting
-
-**Basic Connectivity**
-```powershell
-Test-Connection -ComputerName google.com -Count 4  # Ping
-Test-Connection -ComputerName google.com -Quiet    # True/False only
-
-# Test multiple hosts
-"google.com","microsoft.com" | ForEach-Object { Test-Connection $_ -Count 1 -Quiet }
-```
-
-**Network Configuration**
-```powershell
-Get-NetAdapter                                     # Network adapters
-Get-NetIPAddress                                   # IP addresses
-Get-NetIPConfiguration                             # Full IP config (like ipconfig)
-Get-DnsClientServerAddress                         # DNS servers
-
-# Disable/Enable adapter
-Disable-NetAdapter -Name "Ethernet"
-Enable-NetAdapter -Name "Ethernet"
-
-# Flush DNS
-Clear-DnsClientCache
-```
-
-**Port Testing**
-```powershell
-Test-NetConnection -ComputerName server01 -Port 80
-Test-NetConnection -ComputerName server01 -Port 3389  # RDP
-Test-NetConnection -ComputerName server01 -Port 445   # SMB
-
-# Check if port is listening locally
-Get-NetTCPConnection -LocalPort 80
-Get-NetTCPConnection -State Listen
-```
-
-**Firewall**
-```powershell
-# View firewall rules
-Get-NetFirewallRule | Where-Object {$_.Enabled -eq $true}
-Get-NetFirewallRule -DisplayName "*Remote Desktop*"
-
-# Create rule
-New-NetFirewallRule -DisplayName "Allow Port 8080" -Direction Inbound -LocalPort 8080 -Protocol TCP -Action Allow
-
-# Enable/Disable rule
-Enable-NetFirewallRule -DisplayName "Allow Port 8080"
-Disable-NetFirewallRule -DisplayName "Allow Port 8080"
-
-# Remove rule
-Remove-NetFirewallRule -DisplayName "Allow Port 8080"
-```
-
-### Disk & Storage
-
-**View Disks & Volumes**
-```powershell
-Get-Disk                                           # Physical disks
-Get-Volume                                         # Volumes/drives
-Get-Partition                                      # Partitions
-
-# Disk space
-Get-PSDrive -PSProvider FileSystem
-Get-Volume | Select-Object DriveLetter, @{N="SizeGB";E={[math]::Round($_.Size/1GB,2)}}, @{N="FreeGB";E={[math]::Round($_.SizeRemaining/1GB,2)}}
-```
-
-**Find Large Folders**
-```powershell
-# Get folder sizes
-Get-ChildItem C:\Users -Directory | ForEach-Object {
-    $size = (Get-ChildItem $_.FullName -Recurse -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
-    [PSCustomObject]@{
-        Folder = $_.FullName
-        SizeGB = [math]::Round($size/1GB,2)
-    }
-} | Sort-Object SizeGB -Descending
-```
-
-### Event Logs
-
-**View Logs**
-```powershell
-# Windows Event Logs (Classic)
-Get-EventLog -LogName System -Newest 50
-Get-EventLog -LogName Application -EntryType Error -Newest 20
-
-# Modern Event Logs
-Get-WinEvent -LogName System -MaxEvents 50
-Get-WinEvent -LogName Application -MaxEvents 50
-
-# Filter by time
-Get-WinEvent -FilterHashtable @{LogName='System'; StartTime=(Get-Date).AddDays(-1)}
-
-# Filter by event ID
-Get-WinEvent -FilterHashtable @{LogName='System'; ID=1074,1076,6005,6006}  # Shutdown/startup events
-```
-
-**Search Logs**
-```powershell
-# Find errors in last 24 hours
-Get-WinEvent -FilterHashtable @{
-    LogName='System','Application'
-    Level=2  # Error
-    StartTime=(Get-Date).AddDays(-1)
-} | Select-Object TimeCreated, LogName, Id, Message
-
-# Search by keyword
-Get-WinEvent -LogName System | Where-Object {$_.Message -like "*disk*"}
 ```
 
 ---
 
-## Remote Management
+## Network
 
-**Enable PSRemoting** (run on target machine)
+### Test Connectivity
 ```powershell
-Enable-PSRemoting -Force
+Test-Connection google.com                 # Ping
+Test-Connection google.com -Count 2
+Test-Connection google.com -Quiet          # True/False only
+
+# Multiple hosts
+'google.com','server01' | ForEach {Test-Connection $_ -Count 1 -Quiet}
+```
+*-Quiet is great for scripts*
+
+### Test Ports
+```powershell
+Test-NetConnection server01 -Port 80       # HTTP
+Test-NetConnection server01 -Port 3389     # RDP
+Test-NetConnection server01 -Port 445      # SMB
+Test-NetConnection server01 -Port 22       # SSH
+Test-NetConnection server01 -CommonTCPPort RDP
+```
+*Shows if port is open and reachable*
+
+### Network Info
+```powershell
+Get-NetIPAddress                           # IP addresses
+Get-NetIPConfiguration                     # Full config (ipconfig /all)
+Get-NetAdapter                             # Network adapters
+Get-NetAdapter | Select Name,Status,LinkSpeed,MacAddress
+Get-DnsClientServerAddress                 # DNS servers
+Get-NetRoute -DestinationPrefix "0.0.0.0/0"  # Default gateway
 ```
 
-**One-Time Commands**
+### Network Control
 ```powershell
-# Run command on remote computer
-Invoke-Command -ComputerName Server01 -ScriptBlock { Get-Service }
-Invoke-Command -ComputerName Server01 -ScriptBlock { Get-Process | Where-Object {$_.CPU -gt 10} }
+Enable-NetAdapter -Name "Ethernet"
+Disable-NetAdapter -Name "Ethernet"
+Restart-NetAdapter -Name "Ethernet"
+Clear-DnsClientCache                       # Flush DNS
+Resolve-DnsName google.com                 # DNS lookup
+```
+*Disable/enable adapter to reset without reboot*
 
-# Multiple computers
-Invoke-Command -ComputerName Server01,Server02,Server03 -ScriptBlock { Get-Service -Name Spooler }
+### Ports & Connections
+```powershell
+Get-NetTCPConnection -State Listen         # Listening ports
+Get-NetTCPConnection -LocalPort 80         # What's on port 80
+Get-NetTCPConnection -State Established    # Active connections
 
-# Pass variables
-$serviceName = "Spooler"
-Invoke-Command -ComputerName Server01 -ScriptBlock { 
-    param($svc)
-    Get-Service -Name $svc
-} -ArgumentList $serviceName
+# Find process using port
+Get-NetTCPConnection -LocalPort 80 | Select LocalPort,OwningProcess
+Get-Process -Id (Get-NetTCPConnection -LocalPort 80).OwningProcess
+```
+*Port conflict? Find what's using it*
+
+### Firewall
+```powershell
+Get-NetFirewallRule | Where Enabled -eq True
+Get-NetFirewallRule -DisplayName "*Remote*"
+
+# Create/modify rules
+New-NetFirewallRule -DisplayName "Allow 8080" -Direction Inbound -LocalPort 8080 -Protocol TCP -Action Allow
+Enable-NetFirewallRule -DisplayName "Allow 8080"
+Disable-NetFirewallRule -DisplayName "Allow 8080"
+Remove-NetFirewallRule -DisplayName "Allow 8080"
 ```
 
-**Persistent Sessions**
+---
+
+## Disk
+
+### View Disks
 ```powershell
-# Create session
-$session = New-PSSession -ComputerName Server01
+Get-Volume                                 # All drives
+Get-Volume C                               # Specific drive
+Get-Disk                                   # Physical disks
+Get-Partition                              # Partitions
 
-# Run commands
-Invoke-Command -Session $session -ScriptBlock { Get-Service }
+# Space summary
+Get-Volume | Select DriveLetter,@{N='SizeGB';E={[int]($_.Size/1GB)}},@{N='FreeGB';E={[int]($_.SizeRemaining/1GB)}},@{N='%Free';E={[int]($_.SizeRemaining/$_.Size*100)}}
+```
+*Warn users when %Free <10%*
 
-# Interactive session
-Enter-PSSession -ComputerName Server01
-# Do work...
-Exit-PSSession
+### Find Large Files
+```powershell
+# Top 20 largest files
+Get-ChildItem C:\ -Recurse -File -ErrorAction SilentlyContinue | Sort Length -Desc | Select -First 20 FullName,@{N='SizeMB';E={[int]($_.Length/1MB)}}
 
-# Close session
-Remove-PSSession -Session $session
+# Files >1GB
+Get-ChildItem C:\ -Recurse -File -ErrorAction SilentlyContinue | Where Length -gt 1GB
+```
+*-ErrorAction SilentlyContinue skips permission errors*
+
+### Folder Sizes
+```powershell
+# Size of one folder
+$size = (Get-ChildItem C:\Users\jdoe -Recurse -File | Measure Length -Sum).Sum
+[math]::Round($size/1GB,2)
+
+# All subfolders
+Get-ChildItem C:\Users -Directory | ForEach {
+    $size = (Get-ChildItem $_.FullName -Recurse -File -ErrorAction SilentlyContinue | Measure Length -Sum).Sum
+    [PSCustomObject]@{
+        Folder = $_.Name
+        SizeGB = [math]::Round($size/1GB,2)
+    }
+} | Sort SizeGB -Desc
 ```
 
-**Copy Files**
+### Cleanup
 ```powershell
-# Copy to remote
-Copy-Item C:\local\file.txt -Destination C:\remote\ -ToSession $session
+Remove-Item C:\Windows\Temp\* -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item $env:TEMP\* -Recurse -Force -ErrorAction SilentlyContinue
+Clear-RecycleBin -Force
+Start-Process cleanmgr.exe -ArgumentList "/d C:"  # Disk Cleanup
+```
 
-# Copy from remote
-Copy-Item C:\remote\file.txt -Destination C:\local\ -FromSession $session
+---
+
+## Logs
+
+### View Logs
+```powershell
+Get-EventLog -LogName System -Newest 50    # Classic method
+Get-WinEvent -LogName System -MaxEvents 50  # Modern method (preferred)
+Get-WinEvent -LogName Application -MaxEvents 50
+```
+
+### Filter Logs
+```powershell
+# Last 24 hours
+Get-WinEvent -FilterHashtable @{LogName='System'; StartTime=(Get-Date).AddDays(-1)}
+
+# Errors only
+Get-WinEvent -FilterHashtable @{LogName='System','Application'; Level=2; StartTime=(Get-Date).AddDays(-1)}
+
+# Specific event IDs
+Get-WinEvent -FilterHashtable @{LogName='System'; ID=1074,6005,6006}  # Shutdown/startup
+```
+*Level: 1=Critical, 2=Error, 3=Warning, 4=Info*
+
+### Search Logs
+```powershell
+# Keyword search
+Get-WinEvent -LogName System -MaxEvents 1000 | Where Message -like "*disk*"
+
+# Count errors by source
+Get-WinEvent -FilterHashtable @{LogName='System'; Level=2; StartTime=(Get-Date).AddDays(-7)} | Group ProviderName | Sort Count -Desc
+
+# Export
+Get-WinEvent -FilterHashtable @{LogName='System'; Level=2; StartTime=(Get-Date).AddDays(-1)} | Select TimeCreated,Id,Message | Export-Csv C:\errors.csv -NoTypeInformation
+```
+
+### Common Event IDs
+```powershell
+Get-WinEvent -FilterHashtable @{LogName='System'; ID=1074} -MaxEvents 10  # Shutdowns
+Get-WinEvent -FilterHashtable @{LogName='System'; ID=6005} -MaxEvents 10  # Startups
+Get-WinEvent -FilterHashtable @{LogName='System'; ID=6008} -MaxEvents 10  # Unexpected shutdown
+Get-WinEvent -FilterHashtable @{LogName='Security'; ID=4625} -MaxEvents 20  # Failed logins
+Get-WinEvent -FilterHashtable @{LogName='Security'; ID=4624} -MaxEvents 20  # Successful logins
 ```
 
 ---
 
 ## Active Directory
 
-**Import Module**
+**Import module first:**
 ```powershell
 Import-Module ActiveDirectory
 ```
 
-**Users**
+### AD Users
 ```powershell
-# Get users
 Get-ADUser -Identity jdoe
-Get-ADUser -Filter * | Select-Object Name, SamAccountName
+Get-ADUser -Identity jdoe -Properties *    # All properties
+Get-ADUser -Filter * | Select Name,SamAccountName,Enabled
 Get-ADUser -Filter {Enabled -eq $true}
 Get-ADUser -Filter {Department -eq "IT"}
-
-# Search by name
 Get-ADUser -Filter {Name -like "*John*"}
 
-# Get detailed properties
-Get-ADUser -Identity jdoe -Properties *
+# Common properties
+Get-ADUser jdoe -Properties EmailAddress,Department,LastLogonDate | Select Name,EmailAddress,Department,LastLogonDate
 
-# Create user
-New-ADUser -Name "John Doe" -SamAccountName jdoe -UserPrincipalName jdoe@domain.com -Path "OU=Users,DC=domain,DC=com" -AccountPassword (Read-Host -AsSecureString "Password") -Enabled $true
+# Inactive 90 days
+$date = (Get-Date).AddDays(-90)
+Get-ADUser -Filter {LastLogonDate -lt $date} -Properties LastLogonDate
+```
 
-# Disable/Enable user
-Disable-ADAccount -Identity jdoe
+### Manage Users
+```powershell
+# Create
+New-ADUser -Name "John Doe" -SamAccountName jdoe -UserPrincipalName jdoe@domain.com -Path "OU=Users,DC=domain,DC=com" -AccountPassword (Read-Host -AsSecureString) -Enabled $true
+
+# Modify
+Set-ADUser jdoe -Department "IT"
+Set-ADUser jdoe -EmailAddress "jdoe@domain.com"
 Enable-ADAccount -Identity jdoe
+Disable-ADAccount -Identity jdoe
 
-# Reset password
-Set-ADAccountPassword -Identity jdoe -NewPassword (Read-Host -AsSecureString "New Password") -Reset
+# Password
+Set-ADAccountPassword -Identity jdoe -NewPassword (Read-Host -AsSecureString) -Reset
+Set-ADAccountPassword -Identity jdoe -NewPassword (Read-Host -AsSecureString) -Reset -PassThru | Set-ADUser -ChangePasswordAtLogon $true
 
-# Unlock account
+# Unlock
 Unlock-ADAccount -Identity jdoe
-
-# Find locked accounts
-Search-ADAccount -LockedOut
-
-# Find disabled accounts
-Search-ADAccount -AccountDisabled
 ```
 
-**Groups**
+### Find Problem Accounts
 ```powershell
-# Get groups
+Search-ADAccount -LockedOut                # Locked accounts
+Search-ADAccount -AccountDisabled          # Disabled
+Search-ADAccount -PasswordExpired          # Expired passwords
+Search-ADAccount -AccountInactive -TimeSpan 90  # 90 days inactive
+
+# Unlock all (careful!)
+Search-ADAccount -LockedOut | Unlock-ADAccount
+```
+
+### AD Groups
+```powershell
 Get-ADGroup -Identity "IT Department"
-Get-ADGroup -Filter * | Select-Object Name
-
-# Get group members
+Get-ADGroup -Filter {Name -like "*IT*"}
 Get-ADGroupMember -Identity "IT Department"
-Get-ADGroupMember -Identity "IT Department" -Recursive  # Include nested
-
-# Add user to group
+Get-ADGroupMember -Identity "IT Department" -Recursive  # Nested groups
 Add-ADGroupMember -Identity "IT Department" -Members jdoe
-
-# Remove from group
+Add-ADGroupMember -Identity "IT Department" -Members jdoe,jsmith  # Multiple
 Remove-ADGroupMember -Identity "IT Department" -Members jdoe
-
-# Get user's groups
-Get-ADPrincipalGroupMembership -Identity jdoe
+Get-ADPrincipalGroupMembership -Identity jdoe  # User's groups
 ```
 
-**Computers**
+### AD Computers
 ```powershell
-# Get computers
 Get-ADComputer -Identity PC01
-Get-ADComputer -Filter * | Select-Object Name
 Get-ADComputer -Filter {OperatingSystem -like "*Windows 10*"}
-
-# Get computers in OU
 Get-ADComputer -SearchBase "OU=Workstations,DC=domain,DC=com" -Filter *
 
-# Find inactive computers (no login 90 days)
+# Inactive 90 days
 $date = (Get-Date).AddDays(-90)
-Get-ADComputer -Filter {LastLogonDate -lt $date} -Properties LastLogonDate | Select-Object Name, LastLogonDate
+Get-ADComputer -Filter {LastLogonDate -lt $date} -Properties LastLogonDate | Select Name,LastLogonDate
+```
+
+### Export AD Data
+```powershell
+Get-ADUser -Filter * -Properties EmailAddress,Department | Select Name,EmailAddress,Department,Enabled | Export-Csv C:\users.csv -NoTypeInformation
+Get-ADGroupMember "IT Department" | Export-Csv C:\it-members.csv -NoTypeInformation
+Get-ADComputer -Filter * -Properties OperatingSystem,LastLogonDate | Export-Csv C:\computers.csv -NoTypeInformation
 ```
 
 ---
 
-## Scripting Basics
+## Remote
 
-**Variables**
+### Enable (run on target once)
 ```powershell
-$name = "John"
-$age = 30
-$servers = @("Server01","Server02","Server03")
+Enable-PSRemoting -Force
 ```
 
-**If/Else**
+### One-Time Commands
 ```powershell
-if ($age -ge 18) {
-    Write-Host "Adult"
-} else {
-    Write-Host "Minor"
-}
+Invoke-Command -ComputerName Server01 -ScriptBlock {Get-Service}
+Invoke-Command -ComputerName Server01,Server02 -ScriptBlock {Get-Service Spooler}
+
+# Pass variables
+$svc = "Spooler"
+Invoke-Command -ComputerName Server01 -ScriptBlock {param($s) Get-Service $s} -ArgumentList $svc
 ```
 
-**ForEach Loop**
+### Interactive Session
 ```powershell
-foreach ($server in $servers) {
-    Test-Connection -ComputerName $server -Count 1
-}
+Enter-PSSession -ComputerName Server01
+# Run commands directly on Server01
+Exit-PSSession
 ```
 
-**Functions**
+### Persistent Sessions
 ```powershell
-function Get-DiskInfo {
-    param($ComputerName)
-    
-    Get-Volume | Where-Object {$_.DriveLetter} | Select-Object DriveLetter, 
-        @{N="SizeGB";E={[math]::Round($_.Size/1GB,2)}}, 
-        @{N="FreeGB";E={[math]::Round($_.SizeRemaining/1GB,2)}}
-}
+$s = New-PSSession -ComputerName Server01
+Invoke-Command -Session $s -ScriptBlock {Get-Service}
+Invoke-Command -Session $s -ScriptBlock {Get-Process}
+Remove-PSSession $s
+```
+*Reuse session for multiple commands = faster*
 
-Get-DiskInfo
+### Copy Files
+```powershell
+$s = New-PSSession -ComputerName Server01
+Copy-Item C:\local\file.txt -Destination C:\remote\ -ToSession $s
+Copy-Item C:\remote\file.txt -Destination C:\local\ -FromSession $s
+Remove-PSSession $s
 ```
 
-**Error Handling**
+### Remote Actions
 ```powershell
-try {
-    Stop-Service -Name "NonExistent" -ErrorAction Stop
-} catch {
-    Write-Host "Error: $($_.Exception.Message)"
-}
-```
-
-**Save Script**
-```powershell
-# Save as .ps1 file
-# Run: .\script.ps1
-# Or: powershell.exe -File .\script.ps1
+Restart-Computer -ComputerName Server01 -Force
+Stop-Computer -ComputerName Server01 -Force
+Invoke-Command -ComputerName Server01 -ScriptBlock {Restart-Service Spooler}
 ```
 
 ---
 
-## Common Troubleshooting
+## System Info
 
-**Service Won't Start**
+### System Details
 ```powershell
-# Check service status and dependencies
-Get-Service -Name Spooler | Select-Object *
-Get-Service -Name Spooler -RequiredServices
+Get-ComputerInfo | Select WindowsProductName,WindowsVersion,OsBuildNumber
+Get-ComputerInfo | Select CsName,CsManufacturer,CsModel
+systeminfo                                 # Command prompt alternative
 
-# Check event logs for errors
-Get-WinEvent -FilterHashtable @{LogName='System'; StartTime=(Get-Date).AddHours(-1)} | Where-Object {$_.Message -like "*Spooler*"}
-
-# Try manual start with verbose
-Start-Service -Name Spooler -Verbose
-```
-
-**High CPU/Memory**
-```powershell
-# Find top processes
-Get-Process | Sort-Object CPU -Descending | Select-Object -First 10 Name, Id, CPU
-Get-Process | Sort-Object WS -Descending | Select-Object -First 10 Name, Id, @{N="MemoryMB";E={[math]::Round($_.WS/1MB,2)}}
-
-# Monitor process
-while($true) { 
-    Get-Process -Name chrome | Select-Object CPU, @{N="MemMB";E={[math]::Round($_.WS/1MB,2)}}
-    Start-Sleep -Seconds 5
-}
-```
-
-**Can't Reach Network Resource**
-```powershell
-# Test connectivity
-Test-Connection -ComputerName server01
-Test-NetConnection -ComputerName server01 -Port 445  # SMB
-Test-NetConnection -ComputerName server01 -Port 3389  # RDP
-
-# Check DNS
-Resolve-DnsName server01
-nslookup server01
-
-# Flush DNS cache
-Clear-DnsClientCache
-```
-
-**Disk Space Issues**
-```powershell
-# Find large files
-Get-ChildItem C:\ -Recurse -File | Sort-Object Length -Descending | Select-Object -First 20 FullName, @{N="SizeMB";E={[math]::Round($_.Length/1MB,2)}}
-
-# Clear temp files
-Remove-Item C:\Windows\Temp\* -Recurse -Force -ErrorAction SilentlyContinue
-Remove-Item $env:TEMP\* -Recurse -Force -ErrorAction SilentlyContinue
-
-# Disk cleanup
-Start-Process cleanmgr.exe -ArgumentList "/d C:"
-```
-
-**Script Won't Run**
-```powershell
-# Check execution policy
-Get-ExecutionPolicy
-
-# Set to allow scripts
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-
-# Or bypass for one script
-powershell.exe -ExecutionPolicy Bypass -File .\script.ps1
-```
-
----
-
-## Useful One-Liners
-
-**Export Running Services to CSV**
-```powershell
-Get-Service | Where-Object {$_.Status -eq "Running"} | Export-Csv C:\services.csv -NoTypeInformation
-```
-
-**Restart Multiple Computers**
-```powershell
-Restart-Computer -ComputerName Server01,Server02,Server03 -Force
-```
-
-**Find Who's Logged In**
-```powershell
+# Who's logged in
 query user
-# Or:
-Get-CimInstance -ClassName Win32_ComputerSystem | Select-Object UserName
-```
+Get-CimInstance Win32_ComputerSystem | Select UserName
 
-**Check Uptime**
-```powershell
+# Uptime
 (Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime
+
+# Last boot time
+(Get-CimInstance Win32_OperatingSystem).LastBootUpTime
 ```
 
-**List Installed Software**
+### Hardware Info
 ```powershell
-Get-Package
-# Or registry:
-Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* | Select-Object DisplayName, DisplayVersion, Publisher
+Get-CimInstance Win32_Processor | Select Name,NumberOfCores,NumberOfLogicalProcessors
+Get-CimInstance Win32_PhysicalMemory | Measure Capacity -Sum | Select @{N='TotalGB';E={[int]($_.Sum/1GB)}}
+Get-CimInstance Win32_BIOS | Select Manufacturer,SerialNumber,Version
+Get-CimInstance Win32_BaseBoard | Select Manufacturer,Product
 ```
 
-**Clear Print Queue**
+### Software
 ```powershell
-Stop-Service -Name Spooler
-Remove-Item C:\Windows\System32\spool\PRINTERS\* -Force
-Start-Service -Name Spooler
+Get-Package                                # Installed software
+Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* | Select DisplayName,DisplayVersion,Publisher | Sort DisplayName
+Get-HotFix                                 # Installed updates
+Get-HotFix | Sort InstalledOn -Desc | Select -First 10
 ```
 
-**Export AD Users to CSV**
+### Environment
 ```powershell
-Get-ADUser -Filter * -Properties DisplayName, EmailAddress, Department | Select-Object Name, DisplayName, EmailAddress, Department | Export-Csv C:\users.csv -NoTypeInformation
-```
-
-**Disable Windows Update**
-```powershell
-Stop-Service -Name wuauserv
-Set-Service -Name wuauserv -StartupType Disabled
-```
-
-**Get Windows Version**
-```powershell
-Get-ComputerInfo | Select-Object WindowsProductName, WindowsVersion, OsHardwareAbstractionLayer
-# Or:
+Get-ChildItem Env:                         # Environment variables
+$env:COMPUTERNAME
+$env:USERNAME
+$env:PATH
 [System.Environment]::OSVersion.Version
 ```
 
-**Test Multiple Ports**
+---
+
+## Troubleshooting Scenarios
+
+### Service Won't Start
 ```powershell
-80,443,3389,445 | ForEach-Object { Test-NetConnection -ComputerName server01 -Port $_ }
+# Check status & dependencies
+Get-Service Spooler | Select *
+Get-Service Spooler -RequiredServices
+
+# Check event log for errors
+Get-WinEvent -FilterHashtable @{LogName='System'; StartTime=(Get-Date).AddHours(-1)} | Where Message -like "*Spooler*"
+
+# Try starting with verbose
+Start-Service Spooler -Verbose
+```
+
+### High CPU/Memory
+```powershell
+# Find top processes
+Get-Process | Sort CPU -Desc | Select -First 10 Name,Id,CPU
+Get-Process | Sort WS -Desc | Select -First 10 Name,Id,@{N='MemMB';E={[int]($_.WS/1MB)}}
+
+# Monitor specific process
+while($true){Get-Process chrome | Select CPU,@{N='MemMB';E={[int]($_.WS/1MB)}}; Start-Sleep 5}
+```
+
+### Can't Reach Server
+```powershell
+Test-Connection server01
+Test-NetConnection server01 -Port 445      # SMB
+Test-NetConnection server01 -Port 3389     # RDP
+Resolve-DnsName server01
+Clear-DnsClientCache
+```
+
+### Disk Full
+```powershell
+# Check space
+Get-Volume | Select DriveLetter,@{N='FreeGB';E={[int]($_.SizeRemaining/1GB)}}
+
+# Find large files
+Get-ChildItem C:\ -Recurse -File -ErrorAction SilentlyContinue | Sort Length -Desc | Select -First 20 FullName,@{N='SizeMB';E={[int]($_.Length/1MB)}}
+
+# Cleanup
+Remove-Item C:\Windows\Temp\* -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item $env:TEMP\* -Recurse -Force -ErrorAction SilentlyContinue
+Clear-RecycleBin -Force
+```
+
+### Print Spooler Stuck
+```powershell
+Stop-Service Spooler -Force
+Remove-Item C:\Windows\System32\spool\PRINTERS\* -Force
+Start-Service Spooler
+```
+
+### User Locked Out
+```powershell
+Import-Module ActiveDirectory
+Search-ADAccount -LockedOut
+Unlock-ADAccount -Identity jdoe
+```
+
+### Reset User Password
+```powershell
+# Local user
+Set-LocalUser -Name jdoe -Password (Read-Host -AsSecureString)
+
+# AD user
+Import-Module ActiveDirectory
+Set-ADAccountPassword -Identity jdoe -NewPassword (Read-Host -AsSecureString) -Reset
+Set-ADUser jdoe -ChangePasswordAtLogon $true
+```
+
+### Windows Update Issues
+```powershell
+Stop-Service wuauserv -Force
+Remove-Item C:\Windows\SoftwareDistribution\Download\* -Recurse -Force
+Start-Service wuauserv
 ```
 
 ---
 
-## Tips & Best Practices
+## Quick Tips
 
-- **Use Tab Completion**: Type partial command and press Tab
-- **Get-Member**: See all properties/methods of an object: `Get-Process | Get-Member`
-- **Measure-Object**: Count, sum, average: `Get-ChildItem | Measure-Object -Property Length -Sum`
-- **Select-Object**: Choose specific properties: `Get-Process | Select-Object Name, CPU`
-- **Where-Object**: Filter results: `Get-Service | Where-Object {$_.Status -eq "Running"}`
-- **Sort-Object**: Sort results: `Get-Process | Sort-Object CPU -Descending`
-- **Format-Table/Format-List**: Format output: `Get-Process | Format-Table -AutoSize`
-- **Out-GridView**: View in GUI: `Get-Process | Out-GridView`
-- **Aliases**: `dir` = `Get-ChildItem`, `cd` = `Set-Location`, `cat` = `Get-Content`
+**Aliases:** `dir` = `Get-ChildItem`, `cls` = `Clear-Host`, `cd` = `Set-Location`
 
-**Run as Different User**
+**Tab completion:** Type partial command, press Tab
+
+**View object properties:** `Get-Service | Get-Member`
+
+**Copy output:** `Get-Service | clip` (to clipboard)
+
+**GUI view:** `Get-Process | Out-GridView`
+
+**Suppress errors:** Add `-ErrorAction SilentlyContinue`
+
+**Run as different user:**
 ```powershell
 Start-Process powershell -Credential (Get-Credential) -NoNewWindow
 ```
 
-**Suppress Errors**
+**Background jobs:**
 ```powershell
-Get-Item C:\nonexistent -ErrorAction SilentlyContinue
-```
-
-**Background Jobs**
-```powershell
-Start-Job -ScriptBlock { Get-Process }
+Start-Job -ScriptBlock {Get-Process}
 Get-Job
 Receive-Job -Id 1
 ```
+
+**Measure execution time:**
+```powershell
+Measure-Command {Get-Service}
+```
+
+---
+
+**Version:** PowerShell 5.1+ (Windows) / 7+ (Cross-platform)  
+**Updated:** January 2026
